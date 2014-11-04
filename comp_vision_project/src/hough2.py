@@ -41,8 +41,15 @@ class image_converter:
        x2 = int(x0 - 1000*(-b))
        y2 = int(y0 - 1000*(a))
 
+       print theta
+       #vertical is centered around 180 and 90
        #vertical lines only
-       if rho < 90:
+       #theta_deg = theta * 180 / np.pi
+       #if rho < 90:
+       deg_thresh = 10
+       theta_deg = theta * 180 / np.pi
+       if ((theta_deg < deg_thresh) and (theta_deg > (360-deg_thresh))) or ((theta_deg > (180-deg_thresh)) and (theta_deg < (180+deg_thresh))):
+          print theta_deg
           cv2.line(cv_image,(x1,y1),(x2,y2),(0,0,255),2)
 
     cv2.imshow("Image window", cv_image)
