@@ -41,7 +41,9 @@ class image_converter:
        x2 = int(x0 - 1000*(-b))
        y2 = int(y0 - 1000*(a))
 
-       cv2.line(cv_image,(x1,y1),(x2,y2),(0,0,255),2)
+       #vertical lines only
+       if rho < 90:
+          cv2.line(cv_image,(x1,y1),(x2,y2),(0,0,255),2)
 
     cv2.imshow("Image window", cv_image)
     cv2.waitKey(3)
