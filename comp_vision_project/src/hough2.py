@@ -25,7 +25,7 @@ class image_converter:
     self.gradient_width = 10
     
   #function calculates mean gradient of surrounding pixels on x axis 
-  def calc_deriv(self, line_upper_quartiles, gray):
+  def calc_gradient(self, line_upper_quartiles, gray):
 
     sink_sources = list()    
 
@@ -81,11 +81,6 @@ class image_converter:
 
     return leg
 
-  def find_leg(self, line_centers, line_upper_quartiles, gray):
-    
-    sink_sources = calc_deriv(self, line_upper_quartiles, gray)
-    leg_centers = group_sink_sources(self, line_upper_quartiles, sink_sources) 
-
   #function returns angle's compliment
   def compliment (self,rad_angle):
 
@@ -101,7 +96,7 @@ class image_converter:
   def callback(self,data):
 
     line_centers = list()
-    line_upper_quartiles = list()
+    keypoints = list()
 
     try:
       cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
@@ -119,11 +114,10 @@ class image_converter:
        b = np.sin(theta)
        x0 = a*rho
        y0 = b*rho
-       val = 640
-       x1 = int(x0 + val*(-b))
-       y1 = int(y0 + val*(a))
-       x2 = int(x0 - val*(-b))
-       y2 = int(y0 - val*(a))
+       x1 = int(x0 + 1000*(-b))
+       y1 = int(y0 + 1000*(a))
+       x2 = int(x0 - 1000*(-b))
+       y2 = int(y0 - 1000*(a))
 
        #filter for vertical lines only, centered around degrees 0 and 180
        deg_thresh = 10
@@ -140,20 +134,20 @@ class image_converter:
           line_centers.append(x_center)
           
           #calculate x coordinate of line in upper quartile of image
-          upper_quartile = int(np.tan(comp)*self.image_height/4 + x0)
-          line_upper_quartiles.append(upper_quartile)
+          key = int(np.tan(comp)*self.image_height/4 + x0)
+          keypoints.append(key)
     
 
     #calculate and display sink_sources
     sort_line_centers = sorted(line_centers)
-    sort_line_upper_q = sorted(line_upper_quartiles)
+    sort_keypoints = sorted(keypoints)
 
-    sink_sources = self.calc_deriv(sort_line_upper_q, gray)
-    for n in range(len(sink_sources)):
-        if sink_sources[n] == 1:
-           cv2.circle(cv_image, (sort_line_centers[n],self.image_height/2), 10, (255,0,0), -1)
-	else:
-           cv2.circle(cv_image, (sort_line_centers[n],self.image_height/2), 10, (0,255,0), -1)
+    sink_sources = self.calc_gradient(sort_keypoints, gray)
+    #for n in range(len(sink_sources)):
+    #    if sink_sources[n] == 1:
+    #       cv2.circle(cv_image, (sort_line_centers[n],self.image_height/2), 10, (255,0,0), -1)
+    #    else:
+    #       cv2.circle(cv_image, (sort_line_centers[n],self.image_height/2), 10, (0,255,0), -1)
 
     #calculate and display leg centers
     leg_centers = self.group_sink_sources(sort_line_centers, sink_sources)
