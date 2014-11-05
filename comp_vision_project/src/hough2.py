@@ -75,6 +75,10 @@ class image_converter:
          if left_bound < self.image_width: 
              right_bound = line_centers[n]
 
+    #cleanup remaining leg not terminated by another left bound
+    if right_bound > 0:
+       leg.append((left_bound + right_bound) / 2)
+
     return leg
 
   def find_leg(self, line_centers, line_upper_quartiles, gray):
@@ -141,18 +145,20 @@ class image_converter:
     
 
     #calculate and display sink_sources
-    sink_sources = self.calc_deriv(line_upper_quartiles, gray)
+    sort_line_centers = sorted(line_centers)
+    sort_line_upper_q = sorted(line_upper_quartiles)
+
+    sink_sources = self.calc_deriv(sort_line_upper_q, gray)
     for n in range(len(sink_sources)):
         if sink_sources[n] == 1:
-           cv2.circle(cv_image, (line_centers[n],self.image_height/2), 10, (255,0,0), -1)
+           cv2.circle(cv_image, (sort_line_centers[n],self.image_height/2), 10, (255,0,0), -1)
 	else:
-           cv2.circle(cv_image, (line_centers[n],self.image_height/2), 10, (0,255,0), -1)
+           cv2.circle(cv_image, (sort_line_centers[n],self.image_height/2), 10, (0,255,0), -1)
 
-    leg_centers = self.group_sink_sources(line_centers, sink_sources)
+    #calculate and display leg centers
+    leg_centers = self.group_sink_sources(sort_line_centers, sink_sources)
     for leg in leg_centers:
-       #print leg
        cv2.circle(cv_image, (leg, self.image_height/2), 10, (255,255,255), -1) 
-
 
     cv2.imshow("Image window", cv_image)
     cv2.waitKey(3)
