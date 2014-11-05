@@ -15,12 +15,89 @@ class image_converter:
 
   def __init__(self):
     self.image_pub = rospy.Publisher("image_topic_2",Image)
-
+    
     cv2.namedWindow("Image window", 1)
     self.bridge = CvBridge()
     self.image_sub = rospy.Subscriber("/camera/image_raw",Image,self.callback)
+    self.image_height = 480
+    self.image_width = 640
+    self.max_leg_width = 100
+    self.gradient_width = 10
+    
+  #function calculates mean gradient of surrounding pixels on x axis 
+  def calc_deriv(self, line_upper_quartiles, gray):
+
+    sink_sources = list()    
+
+    for line in line_upper_quartiles:
+       left_sum = 0
+       right_sum = 0
+
+       for n in range(self.gradient_width):
+          posL = line - n
+          posR = line + n
+          if (posL < 0):
+             posL = 0
+          elif (posR > self.image_width - 1):
+             posR = self.image_width - 1
+
+          left_sum = left_sum +  gray[self.image_height/4, posL]
+          right_sum = right_sum + gray[self.image_height/4, posR]
+
+       if left_sum > right_sum:
+          sink_sources.append(1)
+       else:
+          sink_sources.append(-1)
+
+    return sink_sources
+
+  #this function groups matching sinks and sources and filters noise
+  def group_sink_sources(self, line_centers, sink_sources):
+
+    leg = list()
+    left_bound = self.image_width + 1
+    right_bound = -1 
+ 
+    for n in range(len(sink_sources)):
+
+       if sink_sources[n] == 1:	#is a source, left side of leg
+         #set a new left_bound, only once in the beginning
+         if left_bound > self.image_width:
+	     left_bound = line_centers[n]
+         #hit a left bound while having a right bound, end of old leg
+         elif right_bound > 0: 
+             leg.append((left_bound + right_bound)/2)
+             #reset variables for new leg
+             left_bound = line_centers[n]
+	     right_bound = -1
+       else:
+         #set right_bound only if a left_bound exists, keep updating
+         if left_bound < self.image_width: 
+             right_bound = line_centers[n]
+
+    return leg
+
+  def find_leg(self, line_centers, line_upper_quartiles, gray):
+    
+    sink_sources = calc_deriv(self, line_upper_quartiles, gray)
+    leg_centers = group_sink_sources(self, line_upper_quartiles, sink_sources) 
+
+  #function returns angle's compliment
+  def compliment (self,rad_angle):
+
+    if rad_angle < np.pi/2:
+       return np.pi/2 - rad_angle
+    elif rad_angle < np.pi:
+       return np.pi - rad_angle
+    elif rad_angle < np.pi * 3/2:
+       return np.pi *3/2 - rad-angle
+    else: 
+       return np.pi * 2 - rad_angle
 
   def callback(self,data):
+
+    line_centers = list()
+    line_upper_quartiles = list()
 
     try:
       cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
@@ -32,25 +109,50 @@ class image_converter:
 
     lines = cv2.HoughLines(edges,1,np.pi/180,100)
     for rho,theta in lines[0]:
+     
+       #variables used for displaying lines
        a = np.cos(theta)
        b = np.sin(theta)
        x0 = a*rho
        y0 = b*rho
-       x1 = int(x0 + 1000*(-b))
-       y1 = int(y0 + 1000*(a))
-       x2 = int(x0 - 1000*(-b))
-       y2 = int(y0 - 1000*(a))
+       val = 640
+       x1 = int(x0 + val*(-b))
+       y1 = int(y0 + val*(a))
+       x2 = int(x0 - val*(-b))
+       y2 = int(y0 - val*(a))
 
-       print theta
-       #vertical is centered around 180 and 90
-       #vertical lines only
-       #theta_deg = theta * 180 / np.pi
-       #if rho < 90:
+       #filter for vertical lines only, centered around degrees 0 and 180
        deg_thresh = 10
        theta_deg = theta * 180 / np.pi
-       if ((theta_deg < deg_thresh) and (theta_deg > (360-deg_thresh))) or ((theta_deg > (180-deg_thresh)) and (theta_deg < (180+deg_thresh))):
-          print theta_deg
+       if ((theta_deg < deg_thresh) and (theta_deg > (360-deg_thresh))) \
+		or ((theta_deg > (180-deg_thresh)) and (theta_deg < (180+deg_thresh))):
+
+          #display line
           cv2.line(cv_image,(x1,y1),(x2,y2),(0,0,255),2)
+
+          #calculate x coordinate of line in center of image
+          comp = self.compliment(theta)
+          x_center = int(np.tan(comp)*self.image_height/2 + x0)
+          line_centers.append(x_center)
+          
+          #calculate x coordinate of line in upper quartile of image
+          upper_quartile = int(np.tan(comp)*self.image_height/4 + x0)
+          line_upper_quartiles.append(upper_quartile)
+    
+
+    #calculate and display sink_sources
+    sink_sources = self.calc_deriv(line_upper_quartiles, gray)
+    for n in range(len(sink_sources)):
+        if sink_sources[n] == 1:
+           cv2.circle(cv_image, (line_centers[n],self.image_height/2), 10, (255,0,0), -1)
+	else:
+           cv2.circle(cv_image, (line_centers[n],self.image_height/2), 10, (0,255,0), -1)
+
+    leg_centers = self.group_sink_sources(line_centers, sink_sources)
+    for leg in leg_centers:
+       #print leg
+       cv2.circle(cv_image, (leg, self.image_height/2), 10, (255,255,255), -1) 
+
 
     cv2.imshow("Image window", cv_image)
     cv2.waitKey(3)
