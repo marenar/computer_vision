@@ -160,7 +160,7 @@ class image_converter:
     [leg_centers, leg_width] = self.group_sink_sources(sort_line_centers, sink_sources)
     print leg_width
     test = avoid.Obstacle_Avoidance(leg_width)
-    avoid.main()
+    test.main()
     for n in range(len(leg_centers)):
       # print leg_width[n]
        print "inches away: ", (ratio * leg_width[n])
