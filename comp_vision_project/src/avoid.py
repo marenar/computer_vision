@@ -14,5 +14,6 @@ class Obstacle_Avoidance:
 			self.max_width = max(leg_width)
 
 	def main(self):
-		if self.max_width:
+		try:
 			print self.max_width 
+		except AttributeError
