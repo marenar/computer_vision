@@ -10,7 +10,9 @@ from sensor_msgs.msg import LaserScan
 
 class Obstacle_Avoidance:
 	def __init__(self, leg_width):
-		self.max_width = max(leg_width)
+		if len(leg_width):
+			self.max_width = max(leg_width)
 
 	def main(self):
-		print self.max_width 
+		if self.max_width:
+			print self.max_width 
