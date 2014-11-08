@@ -143,13 +143,15 @@ class image_converter:
           line_centers.append(x_center)
           
           #calculate x coordinate of line in upper quartile of image
-          key = int(np.tan(comp)*self.image_height/4 + x0)
+          key = [int(np.tan(comp)*self.image_height/4 + x0),0]
           keypoints.append(key)
     
 
     #calculate and display sink_sources
     sort_line_centers = sorted(line_centers)
+    print keypoints
     sort_keypoints = sorted(keypoints)
+    print sort_keypoints
 
     sink_sources = self.calc_gradient(sort_keypoints, gray)
     #for n in range(len(sink_sources)):
