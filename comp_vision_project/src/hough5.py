@@ -6,11 +6,8 @@ import rospy
 import cv2
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
-from geometry_msgs.msg import Twist
-from geometry_msgs.msg import Vector3
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
-import avoid
 
 #listens to /camera/image_raw topic and converts it to an opencv image
 
@@ -18,17 +15,14 @@ class image_converter:
 
   def __init__(self):
     self.image_pub = rospy.Publisher("image_topic_2",Image)
-    self.vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
     
     cv2.namedWindow("Image window", 1)
     self.bridge = CvBridge()
-
-    self.image_sub = rospy.Subscriber("/camera/image_raw",Image, self.callback)
+    self.image_sub = rospy.Subscriber("/camera/image_raw",Image,self.callback)
     self.image_height = 480
     self.image_width = 640
     self.max_leg_width = 100
     self.gradient_width = 10
-    self.avoid = False
     
   #function calculates mean gradient of surrounding pixels on x axis 
   def calc_gradient(self, line_upper_quartiles, gray):
@@ -89,6 +83,14 @@ class image_converter:
        leg_width.append(right_bound-left_bound)
     return [leg_center, leg_width]
 
+  def generate_points(self, comp, x0):
+   key = list()  
+   points = 10
+   for i in range(points):     
+        key[i] = int(np.tan(comp)*self.image_height*(i/points) + x0)
+
+   return key
+
   #function returns angle's compliment
   def compliment (self,rad_angle):
 
@@ -112,7 +114,6 @@ class image_converter:
       print e
 
     gray = cv2.cvtColor(cv_image,cv2.COLOR_BGR2GRAY)
-    gray = cv2.equalizeHist(gray)
     edges = cv2.Canny(gray,50,150,apertureSize = 3)
 
     lines = cv2.HoughLines(edges,1,np.pi/180,100)
@@ -143,9 +144,9 @@ class image_converter:
           line_centers.append(x_center)
           
           #calculate x coordinate of line in upper quartile of image
-          key = int(np.tan(comp)*self.image_height/4 + x0)
+	  key = self.generate_points(comp,x0)
           keypoints.append(key)
-    
+
 
     #calculate and display sink_sources
     sort_line_centers = sorted(line_centers)
@@ -164,14 +165,9 @@ class image_converter:
 
     #calculate and display leg centers
     [leg_centers, leg_width] = self.group_sink_sources(sort_line_centers, sink_sources)
-    if len(leg_width):
-      print "HI", max(leg_width)
-      if max(leg_width) >= 80:
-        self.avoid = leg_centers[leg_width.index(max(leg_width))] - 320
-        print "AVOID", self.avoid
     for n in range(len(leg_centers)):
       # print leg_width[n]
-       #print "inches away: ", (ratio * leg_width[n])
+       print "inches away: ", (ratio * leg_width[n])
        cv2.circle(cv_image, (leg_centers[n], self.image_height/2), 10, (255,255,255), -1) 
 
     cv2.imshow("Image window", cv_image)
@@ -182,19 +178,14 @@ class image_converter:
     except CvBridgeError, e:
       print e
 
-  def main(self,args):
-    ic = image_converter()
-    rospy.init_node('image_converter', anonymous=True)
-    r = rospy.Rate(12)
-    #while not rospy.is_shutdown():
-      #if self.avoid != False:
-        #print self.avoid
-    try:
-      rospy.spin()
-    except KeyboardInterrupt:
-      print "Shutting down"
-    cv2.destroyAllWindows()
+def main(args):
+  ic = image_converter()
+  rospy.init_node('image_converter', anonymous=True)
+  try:
+    rospy.spin()
+  except KeyboardInterrupt:
+    print "Shutting down"
+  cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    image = image_converter()
-    image.main(sys.argv)
+    main(sys.argv)

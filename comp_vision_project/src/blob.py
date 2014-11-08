@@ -34,7 +34,7 @@ class image_converter:
     #target color = 30, 255, 255
     #Convert to hsv and find range of colors
     hsv = cv2.cvtColor(cv_image,cv2.COLOR_BGR2HSV)
-    thresh = cv2.inRange(hsv,np.array((20, 150, 150)), np.array((340, 255, 255)))
+    thresh = cv2.inRange(hsv,np.array((25, 200, 200)), np.array((35, 255, 255)))
         
     #Find contours in the threshold image
     contours,hierarchy = cv2.findContours(thresh,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
