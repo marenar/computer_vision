@@ -8,6 +8,7 @@ from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
+import avoid
 
 #listens to /camera/image_raw topic and converts it to an opencv image
 
@@ -157,6 +158,9 @@ class image_converter:
 
     #calculate and display leg centers
     [leg_centers, leg_width] = self.group_sink_sources(sort_line_centers, sink_sources)
+    print leg_width
+    test = avoid.Obstacle_Avoidance(leg_width)
+    avoid.main()
     for n in range(len(leg_centers)):
       # print leg_width[n]
        print "inches away: ", (ratio * leg_width[n])
