@@ -129,17 +129,17 @@ class image_converter:
     # return the histogram
     return hist
 
-
-def main(args):
-  ic = image_converter()
-  rospy.init_node('image_converter', anonymous=True)
-  try:
-    rospy.spin()
-    if self.avoid == True:
-      print "True"
-  except KeyboardInterrupt:
-    print "Shutting down"
-  cv2.destroyAllWindows()
-
+  def main(self):
+    rospy.init_node('obstacle_avoidance', anonymous=True)
+    r = rospy.rate(12)
+    while not rospy.is_shutdown():
+      if self.avoid == True:
+        print "True"
+        
 if __name__ == '__main__':
-    main(sys.argv)
+  try:
+    ic = image_converter()
+    ic.main()
+  except rospy.ROSInterruptException:
+    print "Shutting down"
+    cv2.destroyAllWindows()
