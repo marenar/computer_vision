@@ -5,7 +5,8 @@ import sys
 import rospy
 import cv2
 from std_msgs.msg import String
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, LaserScan
+from geometry_msgs.msg import Twist, Vector3
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 from sklearn.cluster import KMeans
@@ -20,8 +21,6 @@ class image_converter:
     self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
     self.image_sub = rospy.Subscriber("/camera/image_raw", Image)
     self.laser_sub = rospy.Subscriber("/scan", LaserScan)
-    ts = message_filters.TimeSynchronizer([self.image_sub, self.laser_sub], 10)
-    ts.registerCallback(self.callback)
 
     cv2.namedWindow("Image window", 1)
     self.bridge = CvBridge()
@@ -44,7 +43,7 @@ class image_converter:
 
     return [low, high]
 
-  def callback(self, image_data, laser_scan):
+  def callback(self, image_data):
 
     try:
       cv_image = self.bridge.imgmsg_to_cv2(image_data, "bgr8")
@@ -52,9 +51,10 @@ class image_converter:
       print e
 
     cv_image = cv2.blur(cv_image,(3,3))
-    image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+    image1 = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
     image2 = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
 
+    image = cv2.resize(image1, image, Size(), )
     # reshape the image to be a list of pixels
     image = image.reshape((image.shape[0] * image.shape[1], 3))
 
