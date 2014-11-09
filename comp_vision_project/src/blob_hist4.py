@@ -19,15 +19,12 @@ class image_converter:
   def __init__(self):
     self.image_pub = rospy.Publisher("image_topic_2",Image)
     self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
-    self.image_sub = rospy.Subscriber("/camera/image_raw", Image, image_callback)
-    self.laser_sub = rospy.Subscriber("/scan", LaserScan, laser_callback)
+    self.image_sub = rospy.Subscriber("/camera/image_raw", Image)
+    self.laser_sub = rospy.Subscriber("/scan", LaserScan)
 
     cv2.namedWindow("Image window", 1)
     self.bridge = CvBridge()
     self.image_sub = rospy.Subscriber("/camera/image_raw",Image,self.callback)
-
-    self.image_width = 640
-    self.image_height = 480
 
   def make_color_range(self, rgbColor):
 
@@ -46,23 +43,20 @@ class image_converter:
 
     return [low, high]
 
-  def image_callback(self, data):
+  def callback(self, image_data):
 
     try:
-      cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+      cv_image = self.bridge.imgmsg_to_cv2(image_data, "bgr8")
     except CvBridgeError, e:
       print e
 
     cv_image = cv2.blur(cv_image,(3,3))
-    #print cv_image.shape
-    #cv_image = cv_image[self.image_height/2: self.image_width/2, self.image_height: self.image_width]
-    cv_image = cv_image[self.image_width/2: self.image_width, self.image_height/2: self.image_height]
-    print cv_image.shape
     image1 = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+    image2 = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
 
-    smaller = cv2.resize(image1,None,fx=.2, fy=.2, interpolation = cv2.INTER_CUBIC)
+    image = cv2.resize(image1, image, Size(), )
     # reshape the image to be a list of pixels
-    image = smaller.reshape((smaller.shape[0] * smaller.shape[1], 3))
+    image = image.reshape((image.shape[0] * image.shape[1], 3))
 
     # cluster the pixel intensities
     clt = KMeans(n_clusters = 3)
@@ -76,7 +70,7 @@ class image_converter:
 
     [low, high] = self.make_color_range(target)
 
-    thresh = cv2.inRange(image1, np.array(low), np.array(high))
+    thresh = cv2.inRange(image2, np.array(low), np.array(high))
         
     #Find contours in the threshold image
     contours,hierarchy = cv2.findContours(thresh,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
@@ -107,21 +101,6 @@ class image_converter:
     cv2.imshow("Image window", cv_image)
     cv2.waitKey(3)
 
-  def laser_callback(self, msg):
-    forward_measurements = []
-    self.avoid = False
-    for i in range(-10, 10):
-      if msg.ranges[i] != 0 and msg.ranges[i] < 7:
-        forward_measurements.append(msg.ranges[i])
-    if len(forward_measurements):
-      self.straight_ahead = sum(forward_measurements) / len(forward_measurements)
-      if self.straight_ahead < 1.3:
-        self.avoid = True
-    if msg.ranges[90] > msg.ranges[270] or msg.ranges[90] == 0:
-      self.direct = 1
-    else:
-      self.direct = -1
-
   def centroid_histogram(self, clt):
     # grab the number of different clusters and create a histogram
     # based on the number of pixels assigned to each cluster
@@ -141,8 +120,6 @@ def main(args):
   rospy.init_node('image_converter', anonymous=True)
   try:
     rospy.spin()
-    if self.avoid == True:
-      print "True"
   except KeyboardInterrupt:
     print "Shutting down"
   cv2.destroyAllWindows()

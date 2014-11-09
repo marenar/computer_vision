@@ -83,7 +83,6 @@ class image_converter:
 
   #function returns angle's compliment
   def compliment (self,rad_angle):
-
     if rad_angle < np.pi/2:
        return np.pi/2 - rad_angle
     elif rad_angle < np.pi:

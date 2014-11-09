@@ -109,7 +109,7 @@ def main(args):
   vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
   image_sub = message_filters.Subscriber("/camera/image_raw", Image)
   laser_sub = message_filters.Subscriber("/scan", LaserScan)
-  ts = message_filters.ApproximateTimeSynchronizer([image_sub, laser_sub], 10, 2)
+  ts = message_filters.TimeSynchronizer([image_sub, laser_sub], 10)
   ts.registerCallback(callback)
 
   cv2.namedWindow("Image window", 1)

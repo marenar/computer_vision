@@ -4,8 +4,10 @@ import roslib
 import sys
 import rospy
 import cv2
+import message_filters
 from std_msgs.msg import String
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, LaserScan
+from geometry_msgs.msg import Twist, Vector3
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 from sklearn.cluster import KMeans
@@ -17,17 +19,19 @@ class image_converter:
 
   def __init__(self):
     self.image_pub = rospy.Publisher("image_topic_2",Image)
+    self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
+    self.image_sub = rospy.Subscriber("/camera/image_raw", Image)
+    self.laser_sub = rospy.Subscriber("/scan", LaserScan)
+    ts = message_filters.TimeSynchronizer([self.image_sub, self.laser_sub], 10)
+    ts.registerCallback(self.callback)
 
     cv2.namedWindow("Image window", 1)
     self.bridge = CvBridge()
-    self.image_sub = rospy.Subscriber("/camera/image_raw",Image,self.callback)
 
-  def make_color_range(self, hsvColor):
+  def make_hsv_range(self, hsvColor):
 
-    rangeval = 5
-
-    low = [hsvColor[0] - rangeval, hsvColor[1] - rangeval, hsvColor[2] - rangeval] 
-    high = [hsvColor[0] + rangeval, hsvColor[1] + rangeval, hsvColor[2] + rangeval]
+    low = [hsvColor[0] - 10, hsvColor[1] - 20, hsvColor[2] - 20] 
+    high = [hsvColor[0] + 10, hsvColor[1] + 20, hsvColor[2] + 20]
 
     for i in low:
       if i < 0:
@@ -39,7 +43,7 @@ class image_converter:
 
     return [low, high]
 
-  def callback(self,data):
+  def callback(self,image, laser_scan):
 
     try:
       cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
@@ -69,9 +73,8 @@ class image_converter:
     # plt.axis("off")
     # plt.imshow(bar)
     # plt.show()
-    low = np.array([0,0,0])
-    high = np.array([0,0,0])
-    target = np.array([0,0,0])
+    low = []
+    high = []
 
     for (percent, color) in zip(hist, clt.cluster_centers_):
       if percent < 10:
@@ -79,29 +82,21 @@ class image_converter:
         #print color.astype("uint8").tolist()
         #print type(color)
 
-        target = color.astype("uint8")
-        print "target", target
-        #print type(target)
-        #print type(target.tolist())
+        integerColor = color.astype("uint8")
+        print integerColor
+        print type(integerColor[0])
 
-        #hsvColor = cv2.cvtColor(integerColor, cv2.COLOR_RGB2HSV)
-        [low, high] = self.make_color_range(target)
-        print "low", low
-        print "high", high
+        hsvColor = cv2.cvtColor(integerColor, cv2.COLOR_RGB2HSV)
+        [low, high] = self.make_hsv_range(hsvColor)
 
     # #opencv HSV range = [180, 255,255]
     # #target color = 30, 255, 255
     # #Convert to hsv and find range of colors
-    print type(target)
-    hsv = cv2.cvtColor(cv_image,cv2.COLOR_BGR2HSV)
-    hsvTarget = cv2.cvtColor(target, cv2.COLOR_RGB2HSV)
-    #thresh = cv2.inRange(image,low, high)
-    #thresh = cv2.inRange(image, np.array((low[0], low[1], low[2])), np.array((high[0], high[1], high[2])))
-    #print type(image)
-    thresh = cv2.inRange(hsv, np.array([150, 150, 150], dtype=np.uint8), np.array([255, 255, 255], dtype=np.uint8))
+    #hsv = cv2.cvtColor(cv_image,cv2.COLOR_BGR2HSV)
+    #thresh = cv2.inRange(hsv,low, high)
         
     # #Find contours in the threshold image
-    #contours,hierarchy = cv2.findContours(thresh,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
+    # contours,hierarchy = cv2.findContours(thresh,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
 
     # #Finding contour with maximum area and store it as best_cnt
     # index = 0
