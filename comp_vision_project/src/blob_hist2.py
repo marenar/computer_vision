@@ -19,12 +19,11 @@ class image_converter:
   def __init__(self):
     self.image_pub = rospy.Publisher("image_topic_2",Image)
     self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
-    self.image_sub = rospy.Subscriber("/camera/image_raw", Image, image_callback)
-    self.laser_sub = rospy.Subscriber("/scan", LaserScan, laser_callback)
+    self.image_sub = rospy.Subscriber("/camera/image_raw", Image, self.image_callback)
+    self.laser_sub = rospy.Subscriber("/scan", LaserScan, self.laser_callback)
 
     cv2.namedWindow("Image window", 1)
     self.bridge = CvBridge()
-    self.image_sub = rospy.Subscriber("/camera/image_raw",Image,self.callback)
 
     self.image_width = 640
     self.image_height = 480
@@ -55,8 +54,7 @@ class image_converter:
 
     cv_image = cv2.blur(cv_image,(3,3))
     #print cv_image.shape
-    #cv_image = cv_image[self.image_height/2: self.image_width/2, self.image_height: self.image_width]
-    cv_image = cv_image[self.image_width/2: self.image_width, self.image_height/2: self.image_height]
+    #cv_image = cv_image[0: self.image_height, 0: self.image_width]
     print cv_image.shape
     image1 = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
 
@@ -141,7 +139,7 @@ def main(args):
   rospy.init_node('image_converter', anonymous=True)
   try:
     rospy.spin()
-    if self.avoid == True:
+    if ic.avoid == True:
       print "True"
   except KeyboardInterrupt:
     print "Shutting down"
