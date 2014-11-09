@@ -19,8 +19,8 @@ class image_converter:
   def __init__(self):
     self.image_pub = rospy.Publisher("image_topic_2",Image)
     self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
-    self.image_sub = rospy.Subscriber("/camera/image_raw", Image, image_callback)
-    self.laser_sub = rospy.Subscriber("/scan", LaserScan, laser_callback)
+    self.image_sub = rospy.Subscriber("/camera/image_raw", Image)
+    self.laser_sub = rospy.Subscriber("/scan", LaserScan)
 
     cv2.namedWindow("Image window", 1)
     self.bridge = CvBridge()
@@ -43,10 +43,10 @@ class image_converter:
 
     return [low, high]
 
-  def image_callback(self, data):
+  def callback(self, image_data):
 
     try:
-      cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+      cv_image = self.bridge.imgmsg_to_cv2(image_data, "bgr8")
     except CvBridgeError, e:
       print e
 
@@ -101,21 +101,6 @@ class image_converter:
     cv2.imshow("Image window", cv_image)
     cv2.waitKey(3)
 
-  def laser_callback(self, msg):
-    forward_measurements = []
-    self.avoid = False
-    for i in range(-10, 10):
-      if msg.ranges[i] != 0 and msg.ranges[i] < 7:
-        forward_measurements.append(msg.ranges[i])
-    if len(forward_measurements):
-      self.straight_ahead = sum(forward_measurements) / len(forward_measurements)
-      if self.straight_ahead < 1.3:
-        self.avoid = True
-    if msg.ranges[90] > msg.ranges[270] or msg.ranges[90] == 0:
-      self.direct = 1
-    else:
-      self.direct = -1
-
   def centroid_histogram(self, clt):
     # grab the number of different clusters and create a histogram
     # based on the number of pixels assigned to each cluster
@@ -135,8 +120,6 @@ def main(args):
   rospy.init_node('image_converter', anonymous=True)
   try:
     rospy.spin()
-    if self.avoid == True:
-      print "True"
   except KeyboardInterrupt:
     print "Shutting down"
   cv2.destroyAllWindows()
