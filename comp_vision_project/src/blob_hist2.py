@@ -27,6 +27,9 @@ class image_converter:
 
     self.image_width = 640
     self.image_height = 480
+    self.avoid = False
+    self.counter = 0
+    self.target = []
 
   def make_color_range(self, rgbColor):
 
@@ -46,6 +49,10 @@ class image_converter:
     return [low, high]
 
   def image_callback(self, data):
+    if self.counter == 6:
+      self.counter = 0
+    else:
+      self.counter += 1
 
     try:
       cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
@@ -54,63 +61,69 @@ class image_converter:
 
     cv_image = cv2.blur(cv_image,(3,3))
     #print cv_image.shape
-    #cv_image = cv_image[0: self.image_height, 0: self.image_width]
-    print cv_image.shape
+    #cv_image = cv_image[self.image_height/2: self.image_height, 0: self.image_width]
+    #print cv_image.shape
     image1 = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
 
-    smaller = cv2.resize(image1,None,fx=.2, fy=.2, interpolation = cv2.INTER_CUBIC)
-    # reshape the image to be a list of pixels
-    image = smaller.reshape((smaller.shape[0] * smaller.shape[1], 3))
+    if self.counter == 0:
+      smaller = cv2.resize(image1,None,fx=.1, fy=.1, interpolation = cv2.INTER_CUBIC)
+      # reshape the image to be a list of pixels
+      image = smaller.reshape((smaller.shape[0] * smaller.shape[1], 3))
 
-    # cluster the pixel intensities
-    clt = KMeans(n_clusters = 3)
-    clt.fit(image)
+      # cluster the pixel intensities
+      clt = KMeans(n_clusters = 3)
+      clt.fit(image)
 
-    # build a histogram of clusters
-    hist = self.centroid_histogram(clt)
+      # build a histogram of clusters
+      hist = self.centroid_histogram(clt)
 
-    percents = list(hist)
-    target = clt.cluster_centers_[percents.index(min(percents))].astype("uint8")
+      percents = list(hist)
+      self.target = clt.cluster_centers_[percents.index(min(percents))].astype("uint8")
 
-    [low, high] = self.make_color_range(target)
+    if len(self.target):
+      [low, high] = self.make_color_range(self.target)
 
-    thresh = cv2.inRange(image1, np.array(low), np.array(high))
-        
-    #Find contours in the threshold image
-    contours,hierarchy = cv2.findContours(thresh,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
+      thresh = cv2.inRange(cv_image, np.array(low), np.array(high))
+          
+      #Find contours in the threshold image
+      contours,hierarchy = cv2.findContours(thresh,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
 
-    #Finding contour with maximum area and store it as best_cnt
-    index = 0
-    max_area = 0
-    for i in range(len(contours)):
-       area = cv2.contourArea(contours[i])
-       if area > max_area:
-           max_area = area
-           best_cnt = contours[i]
-           index = i
+      #Finding contour with maximum area and store it as best_cnt
+      index = 0
+      max_area = 0
+      for i in range(len(contours)):
+         area = cv2.contourArea(contours[i])
+         if area > max_area:
+             max_area = area
+             best_cnt = contours[i]
+             index = i
 
-    try:
-       best_cnt
-    except NameError: 
-       print "no blobs"
-    else:
-       #Finding centroids of best_cnt and draw a circle there
-       M = cv2.moments(best_cnt)
-       cx,cy = int(M['m10']/M['m00']), int(M['m01']/M['m00'])
-       cv2.circle(cv_image,(cx,cy),10,255,-1)
+      try:
+         best_cnt
+      except NameError: 
+         print "no blobs"
+      else:
+         #Finding centroids of best_cnt and draw a circle there
+         M = cv2.moments(best_cnt)
+         cx,cy = int(M['m10']/M['m00']), int(M['m01']/M['m00'])
+         cv2.circle(cv_image,(cx,cy),10,255,-1)
 
-       #draw the most likely contour
-       cv2.drawContours(cv_image,  contours, index, (0,255,0), 3)
+         #draw the most likely contour
+         cv2.drawContours(cv_image,  contours, index, (0,255,0), 3)
 
-    cv2.imshow("Image window", cv_image)
-    cv2.waitKey(3)
+      cv2.imshow("Image window", cv_image)
+      cv2.waitKey(3)
+    self.target = []
 
   def laser_callback(self, msg):
     forward_measurements = []
     self.avoid = False
-    for i in range(-10, 10):
-      if msg.ranges[i] != 0 and msg.ranges[i] < 7:
-        forward_measurements.append(msg.ranges[i])
+    for i in range(360):
+      if i < 15 or i > 345:
+        try:
+          if msg.ranges[i] != 0 and msg.ranges[i] < 7:
+            forward_measurements.append(msg.ranges[i])
+        except IndexError: pass
     if len(forward_measurements):
       self.straight_ahead = sum(forward_measurements) / len(forward_measurements)
       if self.straight_ahead < 1.3:
@@ -135,10 +148,11 @@ class image_converter:
 
   def main(self):
     rospy.init_node('obstacle_avoidance', anonymous=True)
-    r = rospy.rate(12)
+    rospy.Rate(0.1)
     while not rospy.is_shutdown():
-      if self.avoid == True:
-        print "True"
+      r = 2
+      #if self.avoid == True:
+        #print "True"
         
 if __name__ == '__main__':
   try:
