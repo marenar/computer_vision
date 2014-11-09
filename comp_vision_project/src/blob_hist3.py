@@ -14,24 +14,10 @@ from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 
 
-def make_color_range(rgbColor):
-
-  rangeval = 5
-
-  low = [rgbColor[0] - rangeval, rgbColor[1] - rangeval, rgbColor[2] - rangeval] 
-  high = [rgbColor[0] + rangeval, rgbColor[1] + rangeval, rgbColor[2] + rangeval]
-
-  for i in low:
-    if i < 0:
-      i = 0
-
-  for i in high:
-    if i > 255:
-      i = 255
-
-  return [low, high]
+#listens to /camera/image_raw topic and converts it to an opencv image
 
 def callback(image_data, laser_scan):
+  bridge = CvBridge()
 
   try:
     cv_image = bridge.imgmsg_to_cv2(image_data, "bgr8")
@@ -87,6 +73,22 @@ def callback(image_data, laser_scan):
 
   cv2.imshow("Image window", cv_image)
   cv2.waitKey(3)
+
+def make_color_range(rgbColor):
+  rangeval = 5
+
+  low = [rgbColor[0] - rangeval, rgbColor[1] - rangeval, rgbColor[2] - rangeval] 
+  high = [rgbColor[0] + rangeval, rgbColor[1] + rangeval, rgbColor[2] + rangeval]
+
+  for i in low:
+    if i < 0:
+      i = 0
+
+  for i in high:
+    if i > 255:
+      i = 255
+
+  return [low, high]
 
 def centroid_histogram(clt):
   # grab the number of different clusters and create a histogram
