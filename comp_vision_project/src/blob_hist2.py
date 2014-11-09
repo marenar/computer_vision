@@ -48,7 +48,8 @@ class image_converter:
 
     cv_image = cv2.blur(cv_image,(3,3))
     image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
-    #image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
+    image2 = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+    hsv = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
 
     # reshape the image to be a list of pixels
     image = image.reshape((image.shape[0] * image.shape[1], 3))
@@ -60,8 +61,8 @@ class image_converter:
     # build a histogram of clusters and then create a figure
     # representing the number of pixels labeled to each color
     hist = self.centroid_histogram(clt)
-    #print hist
-    #print clt.cluster_centers_
+    print hist
+    print clt.cluster_centers_
     #bar = self.plot_colors(hist, clt.cluster_centers_)
 
     # # show our color bart
@@ -73,58 +74,52 @@ class image_converter:
     high = np.array([0,0,0])
     target = np.array([0,0,0])
 
-    for (percent, color) in zip(hist, clt.cluster_centers_):
-      if percent < 10:
-        #print "color list"
-        #print color.astype("uint8").tolist()
-        #print type(color)
+    percents = list(hist)
+    target = clt.cluster_centers_[percents.index(min(percents))].astype("uint8")
 
-        target = color.astype("uint8")
-        print "target", target
-        #print type(target)
-        #print type(target.tolist())
-
-        #hsvColor = cv2.cvtColor(integerColor, cv2.COLOR_RGB2HSV)
-        [low, high] = self.make_color_range(target)
-        print "low", low
-        print "high", high
+    #hsvColor = cv2.cvtColor(integerColor, cv2.COLOR_RGB2HSV)
+    [low, high] = self.make_color_range(target)
+    print "low", low
+    print "high", high
 
     # #opencv HSV range = [180, 255,255]
     # #target color = 30, 255, 255
     # #Convert to hsv and find range of colors
-    print type(target)
-    hsv = cv2.cvtColor(cv_image,cv2.COLOR_BGR2HSV)
-    hsvTarget = cv2.cvtColor(target, cv2.COLOR_RGB2HSV)
+    #print type(target)
+    #hsv = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
+    #hsvTarget = cv2.cvtColor(target, cv2.COLOR_RGB2HSV)
     #thresh = cv2.inRange(image,low, high)
     #thresh = cv2.inRange(image, np.array((low[0], low[1], low[2])), np.array((high[0], high[1], high[2])))
-    #print type(image)
-    thresh = cv2.inRange(hsv, np.array([150, 150, 150], dtype=np.uint8), np.array([255, 255, 255], dtype=np.uint8))
+    #print type(image), len(image), image[0]
+    #print type(np.array([150,150,150], dtype=np.uint8)), len(np.array([150, 150, 150], dtype=np.uint8))
+    #thresh = cv2.inRange(image2, np.array([150, 150, 150], dtype=np.uint8), np.array([255, 255, 255], dtype=np.uint8))
+    thresh = cv2.inRange(image2, np.array(low), np.array(high))
         
     # #Find contours in the threshold image
-    #contours,hierarchy = cv2.findContours(thresh,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
+    contours,hierarchy = cv2.findContours(thresh,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
 
-    # #Finding contour with maximum area and store it as best_cnt
-    # index = 0
-    # max_area = 0
-    # for i in range(len(contours)):
-    #    area = cv2.contourArea(contours[i])
-    #    if area > max_area:
-    #        max_area = area
-    #        best_cnt = contours[i]
-    #        index = i
+    #Finding contour with maximum area and store it as best_cnt
+    index = 0
+    max_area = 0
+    for i in range(len(contours)):
+       area = cv2.contourArea(contours[i])
+       if area > max_area:
+           max_area = area
+           best_cnt = contours[i]
+           index = i
 
-    # try:
-    #    best_cnt
-    # except NameError: 
-    #    print "no blobs"
-    # else:
-    #    #Finding centroids of best_cnt and draw a circle there
-    #    M = cv2.moments(best_cnt)
-    #    cx,cy = int(M['m10']/M['m00']), int(M['m01']/M['m00'])
-    #    cv2.circle(cv_image,(cx,cy),10,255,-1)
+    try:
+       best_cnt
+    except NameError: 
+       print "no blobs"
+    else:
+       #Finding centroids of best_cnt and draw a circle there
+       M = cv2.moments(best_cnt)
+       cx,cy = int(M['m10']/M['m00']), int(M['m01']/M['m00'])
+       cv2.circle(cv_image,(cx,cy),10,255,-1)
 
-    #    #draw the most likely contour
-    #    cv2.drawContours(cv_image,  contours, index, (0,255,0), 3)
+       #draw the most likely contour
+       cv2.drawContours(cv_image,  contours, index, (0,255,0), 3)
 
     cv2.imshow("Image window", cv_image)
     cv2.waitKey(3)

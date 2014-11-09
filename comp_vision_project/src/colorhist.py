@@ -44,6 +44,9 @@ class image_converter:
 		# build a histogram of clusters and then create a figure
 		# representing the number of pixels labeled to each color
 		hist = centroid_histogram(clt)
+		print hist
+		print clt.cluster_centers_
+
 		bar = plot_colors(hist, clt.cluster_centers_)
 
 		# show our color bart
