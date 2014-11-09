@@ -26,6 +26,9 @@ class image_converter:
     self.bridge = CvBridge()
     self.image_sub = rospy.Subscriber("/camera/image_raw",Image,self.callback)
 
+    self.image_width = 640
+    self.image_height = 480
+
   def make_color_range(self, rgbColor):
 
     rangeval = 5
@@ -51,12 +54,15 @@ class image_converter:
       print e
 
     cv_image = cv2.blur(cv_image,(3,3))
+    #print cv_image.shape
+    #cv_image = cv_image[self.image_height/2: self.image_width/2, self.image_height: self.image_width]
+    cv_image = cv_image[self.image_width/2: self.image_width, self.image_height/2: self.image_height]
+    print cv_image.shape
     image1 = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
-    image2 = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
 
-    image = cv2.resize(image1, image, Size(), )
+    smaller = cv2.resize(image1,None,fx=.2, fy=.2, interpolation = cv2.INTER_CUBIC)
     # reshape the image to be a list of pixels
-    image = image.reshape((image.shape[0] * image.shape[1], 3))
+    image = smaller.reshape((smaller.shape[0] * smaller.shape[1], 3))
 
     # cluster the pixel intensities
     clt = KMeans(n_clusters = 3)
@@ -70,7 +76,7 @@ class image_converter:
 
     [low, high] = self.make_color_range(target)
 
-    thresh = cv2.inRange(image2, np.array(low), np.array(high))
+    thresh = cv2.inRange(image1, np.array(low), np.array(high))
         
     #Find contours in the threshold image
     contours,hierarchy = cv2.findContours(thresh,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
