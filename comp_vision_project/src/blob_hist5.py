@@ -1,7 +1,7 @@
 #!/usr/bin/env python
+
 import roslib
 #roslib.load_manifest('my_package')
-import sys
 import rospy
 import cv2
 import datetime
@@ -13,8 +13,6 @@ import numpy as np
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 
-#listens to /camera/image_raw topic and converts it to an opencv image
-
 class image_converter:
 
   def __init__(self):
@@ -25,9 +23,9 @@ class image_converter:
 
     cv2.namedWindow("Image window", 1)
     self.bridge = CvBridge()
-
     self.image_width = 640
     self.image_height = 480
+
     self.avoid = False
     self.blob = False 
     self.distance_to_wall = -1.0
@@ -39,7 +37,6 @@ class image_converter:
     self.target = []
 
   def make_color_range(self, rgbColor):
-
     rangeval = 15
 
     low = [rgbColor[0] - rangeval, rgbColor[1] - rangeval, rgbColor[2] - rangeval] 
@@ -56,6 +53,7 @@ class image_converter:
     return [low, high]
 
   def image_callback(self, data):
+    # only run the k means clustering every 5 times we get image data, because image data is frequent and k means is computationally expensive
     if self.counter == 6:
       self.counter = 0
     else:
@@ -67,17 +65,15 @@ class image_converter:
       print e
 
     cv_image = cv2.blur(cv_image,(3,3))
-    #print cv_image.shape
-    #cv_image = cv_image[self.image_height/2: self.image_height, 0: self.image_width]
-    #print cv_image.shape
     image1 = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
 
     if self.counter == 0:
+      # shrink image for faster processing
       smaller = cv2.resize(image1,None,fx=.1, fy=.1, interpolation = cv2.INTER_CUBIC)
       # reshape the image to be a list of pixels
       image = smaller.reshape((smaller.shape[0] * smaller.shape[1], 3))
 
-      # cluster the pixel intensities
+      # cluster the pixel intensities using k means clustering
       clt = KMeans(n_clusters = 3)
       clt.fit(image)
 
@@ -85,6 +81,7 @@ class image_converter:
       hist = self.centroid_histogram(clt)
 
       percents = list(hist)
+      # If the color in the histogram takes up less than 10% of the image, it meets our criteria for a small obstacle
       if min(percents) < 0.1:
         self.target = clt.cluster_centers_[percents.index(min(percents))].astype("uint8")
       else:
@@ -117,7 +114,10 @@ class image_converter:
          #Finding centroids of best_cnt and draw a circle there
          M = cv2.moments(best_cnt)
          cx,cy = int(M['m10']/M['m00']), int(M['m01']/M['m00'])
+         # setting self.blob triggers the obstacle avoidance part of the finite state controller
          self.blob = cx - 320
+         # if the direction has not been set within the last 3 seconds (avoids noise), turn away from the camera obstacle
+         # (turn right if the obstacle appears in left of frame, turn left if obstacle appears in right of frame).
          if datetime.datetime.now() - self.update > datetime.timedelta(seconds = 3):
           print "blob time", datetime.datetime.now() - self.update
           if self.blob < 0:
@@ -137,9 +137,9 @@ class image_converter:
 
   def laser_callback(self, msg):
     forward_measurements = []
+    valid_measurements = []
     ninety = []
     twoseventy = []
-    valid_measurements = []
     self.avoid = False
     for i in range(360):
       try:
@@ -154,10 +154,12 @@ class image_converter:
       except IndexError: pass
     if len(forward_measurements):
       self.straight_ahead = sum(forward_measurements) / len(forward_measurements)
+      # if there is an obstacle within 1 meter straight ahead, set self.avoid to True, triggering the obstacle avoidance part of the finite state controller.
       if self.straight_ahead != 0 and self.straight_ahead < 1:
         self.avoid = True
         try:
-          if datetime.datetime.now() - self.update > datetime.timedelta(seconds = 3):
+          # if the direction has not been set within the last 3 seconds (avoids noise), turn towards the direction (90 or 270 degrees) with more space
+          if datetime.datetime.now() - self.update > datetime.timedelta(seconds = 3): 
             print "wall time", datetime.datetime.now() - self.update
             vals = [sum(ninety) / len(ninety), sum(twoseventy) / len(twoseventy)]
             if vals[0] > vals[1] or vals[0] == 0:
@@ -167,6 +169,7 @@ class image_converter:
             self.update = datetime.datetime.now()
         except IndexError: pass
     if len(valid_measurements) and self.avoid == False:
+      # wall following variables set, triggering wall following part of the finite state controller.
       self.distance_to_wall = min(valid_measurements)
       self.angle_of_wall = msg.ranges.index(self.distance_to_wall)
     else:
@@ -184,8 +187,7 @@ class image_converter:
     # normalize the histogram, such that it sums to one
     hist = hist.astype("float")
     hist /= hist.sum()
-
-    # return the histogram
+    
     return hist
 
   def main(self):
@@ -193,16 +195,16 @@ class image_converter:
     r = rospy.Rate(2)
     while not rospy.is_shutdown():
       if self.avoid != False or self.blob != False or datetime.datetime.now() - self.update < datetime.timedelta(seconds = 3):
-        print "avoid / blob"
+        # An obstacle was found by the lidar or the camera in the last 3 seconds, so turn in the direction the lidar or camera specified
         msg = Twist(linear=Vector3(x=0.02),angular=Vector3(z=self.direct * 0.3))
       elif self.avoid == False and 0 < self.angle_of_wall < 180:
-        print "follow"
+        # Wall following behavior
         msg = Twist(linear=Vector3(x=0.1), angular=Vector3(z=(self.angle_of_wall - 90) * 0.01))
       elif self.avoid == False and 180 < self.angle_of_wall < 360: 
-        print "follow"
+        # Wall following behavior
         msg = Twist(linear=Vector3(x=0.1), angular=Vector3(z=(self.angle_of_wall - 270) * 0.01))
       else:
-        print "line"
+        # Go straight
         msg = Twist(linear=Vector3(x=0.1))
       self.vel_pub.publish(msg)
       r.sleep()
