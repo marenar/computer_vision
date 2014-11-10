@@ -28,12 +28,15 @@ class image_converter:
     self.image_width = 640
     self.image_height = 480
     self.avoid = False
+    self.blob = False
     self.counter = 0
     self.target = []
+    self.blob_direct = 1
+    self.avoid_direct = 1
 
   def make_color_range(self, rgbColor):
 
-    rangeval = 5
+    rangeval = 15
 
     low = [rgbColor[0] - rangeval, rgbColor[1] - rangeval, rgbColor[2] - rangeval] 
     high = [rgbColor[0] + rangeval, rgbColor[1] + rangeval, rgbColor[2] + rangeval]
@@ -49,7 +52,7 @@ class image_converter:
     return [low, high]
 
   def image_callback(self, data):
-    if self.counter == 6:
+    if self.counter == 11:
       self.counter = 0
     else:
       self.counter += 1
@@ -78,12 +81,16 @@ class image_converter:
       hist = self.centroid_histogram(clt)
 
       percents = list(hist)
-      self.target = clt.cluster_centers_[percents.index(min(percents))].astype("uint8")
+      if min(percents) < 0.1:
+        self.target = clt.cluster_centers_[percents.index(min(percents))].astype("uint8")
+      else:
+        self.target = []
+        self.blob = False
 
     if len(self.target):
       [low, high] = self.make_color_range(self.target)
 
-      thresh = cv2.inRange(cv_image, np.array(low), np.array(high))
+      thresh = cv2.inRange(image1, np.array(low), np.array(high))
           
       #Find contours in the threshold image
       contours,hierarchy = cv2.findContours(thresh,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
@@ -101,11 +108,16 @@ class image_converter:
       try:
          best_cnt
       except NameError: 
-         print "no blobs"
+         self.blob = False
       else:
          #Finding centroids of best_cnt and draw a circle there
          M = cv2.moments(best_cnt)
          cx,cy = int(M['m10']/M['m00']), int(M['m01']/M['m00'])
+         self.blob = cx - 320
+         if self.blob < 0: 
+          self.blob_direct = -1 
+         else:
+          self.blob_direct = 1
          cv2.circle(cv_image,(cx,cy),10,255,-1)
 
          #draw the most likely contour
@@ -113,7 +125,6 @@ class image_converter:
 
       cv2.imshow("Image window", cv_image)
       cv2.waitKey(3)
-    self.target = []
 
   def laser_callback(self, msg):
     forward_measurements = []
@@ -126,12 +137,16 @@ class image_converter:
         except IndexError: pass
     if len(forward_measurements):
       self.straight_ahead = sum(forward_measurements) / len(forward_measurements)
-      if self.straight_ahead < 1.3:
+      if self.straight_ahead < 1:
         self.avoid = True
-    if msg.ranges[90] > msg.ranges[270] or msg.ranges[90] == 0:
-      self.direct = 1
-    else:
-      self.direct = -1
+    try:
+      if self.avoid == True:
+        print msg.ranges[90], msg.ranges[270]
+      if msg.ranges[90] + 0.5 > msg.ranges[270] or msg.ranges[90] == 0:
+        self.avoid_direct = 1
+      else:
+        self.avoid_direct = -1
+    except IndexError: pass
 
   def centroid_histogram(self, clt):
     # grab the number of different clusters and create a histogram
@@ -148,11 +163,25 @@ class image_converter:
 
   def main(self):
     rospy.init_node('obstacle_avoidance', anonymous=True)
-    rospy.Rate(0.1)
+    r = rospy.Rate(2)
     while not rospy.is_shutdown():
-      r = 2
-      #if self.avoid == True:
-        #print "True"
+      if self.avoid == True and self.blob != False:
+        print "both", self.avoid_direct, self.blob_direct
+        if self.avoid_direct != self.blob_direct:
+          msg = Twist(linear=Vector3(x=0.05), angular=Vector3(z=0.4))
+        else:
+          msg = Twist(linear=Vector3(x=0.05), angular=Vector3(z=self.avoid_direct * 0.4))
+      if self.avoid == True:
+        print "avoid", self.avoid, self.blob, self.avoid_direct
+        msg = Twist(linear=Vector3(x=0.05),angular=Vector3(z=self.avoid_direct * 0.4))
+      elif self.blob != False:
+        print "blob", self.avoid, self.blob, self.blob_direct
+        msg = Twist(linear=Vector3(x=0.05),angular=Vector3(z=self.blob_direct * 0.2))
+      else:
+        print "line", self.avoid, self.blob
+        msg = Twist(linear=Vector3(x=0.1))
+      self.vel_pub.publish(msg)
+      r.sleep()
         
 if __name__ == '__main__':
   try:
